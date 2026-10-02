@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>投資損益記錄</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f5d8a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="投資記錄">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1c1b19;--mu:#77736b;--bd:#e4e1da;--up:#d6362f;--dn:#1f9d55;--ac:#2f5d8a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#201f1e;--tx:#ecebe7;--mu:#9a968d;--bd:#33312e;--up:#ff6b64;--dn:#4cc380;--ac:#7fb0e0}}
+:root[data-theme="dark"]{--bg:#161615;--card:#201f1e;--tx:#ecebe7;--mu:#9a968d;--bd:#33312e;--up:#ff6b64;--dn:#4cc380;--ac:#7fb0e0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.5}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mu);font-size:13px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.total{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+.lbl{color:var(--mu);font-size:13px}
+.up{color:var(--up)}.dn{color:var(--dn)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);gap:4px}
+input,select{font:inherit;font-size:15px;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+button{font:inherit;padding:9px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;cursor:pointer}
+button.del{background:none;color:var(--mu);padding:2px 8px}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mu);font-weight:500;font-size:12px}
+th:first-child,td:first-child{text-align:left}
+h2{font-size:16px;margin:0 0 10px}
+.empty{color:var(--mu);padding:12px 0;text-align:center}
+.warn{color:var(--up);font-size:12px}
+.set{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.stats .total{font-size:28px}
+input.px{width:90px;padding:4px 6px;text-align:right}
+.note{color:var(--mu);font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+  <h1>投資損益記錄</h1>
+  <div class="sub">台股買賣記錄，自動計算手續費、證交稅與已實現損益（平均成本法）</div>
+
+  <div class="card stats">
+    <div><div class="lbl">已實現損益</div><div class="total" id="total">0</div></div>
+    <div><div class="lbl">未實現損益</div><div class="total" id="unr">0</div></div>
+    <div><div class="lbl">合計</div><div class="total" id="all">0</div></div>
+  </div>
+
+  <div class="card">
+    <h2>新增交易</h2>
+    <form id="f">
+      <label>標的代號／名稱<input id="tk" required placeholder="2330 台積電"></label>
+      <label>買／賣<select id="sd"><option value="buy">買進</option><option value="sell">賣出</option></select></label>
+      <label>日期<input id="dt" type="date" required></label>
+      <label>價格<input id="pr" type="number" step="any" min="0" required></label>
+      <label>數量<input id="qt" type="number" step="any" min="0" required></label>
+      <label>單位<select id="un"><option value="1000">張（1000 股）</option><option value="1">股（零股）</option></select></label>
+      <label>手續費＋稅（元）<input id="fe" type="number" step="any" min="0" placeholder="留空＝自動計算"></label>
+      <button type="submit">新增</button>
+    </form>
+    <div class="set">
+      <label>手續費折數（10＝不打折）<input id="dc" type="number" step="any" min="0" max="10" value="10"></label>
+      <label>最低手續費（元）<input id="mf" type="number" min="0" value="20"></label>
+      <label>證交稅（賣出時）<select id="tx"><option value="0.003">一般股票 0.3%</option><option value="0.001">ETF 0.1%</option><option value="0.0015">當沖 0.15%</option></select></label>
+    </div>
+    <div class="note">費用欄留空時，依上方設定自動計算（手續費 0.1425% × 折數，賣出另加證交稅）。實際金額以券商成交單為準，可直接手動填入覆蓋。</div>
+    <div class="note" id="mode"></div>
+  </div>
+
+  <div class="card">
+    <h2>各標的彙總</h2>
+    <div class="wrap"><table id="sum"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>備份</h2>
+    <button id="exp" type="button">匯出備份</button>
+    <button id="imp" type="button">匯入備份</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+    <div class="note">資料只存在這支手機，換手機或清除瀏覽器資料前，請先匯出備份檔，再到新裝置匯入。</div>
+  </div>
+
+  <div class="card">
+    <h2>交易明細</h2>
+    <div class="wrap"><table id="log"></table></div>
+    <div class="note">台股慣例：紅色＝獲利、綠色＝虧損。未實現損益＝（現價 × 持有股數）－ 持有成本，現價需自行輸入，且未扣除未來賣出的手續費與證交稅。賣出時以當下持有的平均成本計算損益，手續費與稅會一併計入。</div>
+  </div>
+</main>
+<script>
+let trades = [], prices = {};
+const getSet = () => ({dc: $("dc").value, mf: $("mf").value, tx: $("tx").value});
+const applySet = s => { if (!s) return; $("dc").value = s.dc ?? 10; $("mf").value = s.mf ?? 20; $("tx").value = s.tx ?? "0.003"; };
+const LS = 'invest-trades-v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-US', {maximumFractionDigits: 2});
+const cls = n => n > 0 ? 'up' : n < 0 ? 'dn' : '';
+const sgn = n => (n > 0 ? '+' : '') + fmt(n);
+
+$('dt').value = new Date().toISOString().slice(0, 10);
+
+function save() {
+  try { localStorage.setItem(LS, JSON.stringify({trades, settings: getSet(), prices})); } catch (e) { console.error(e); }
+}
+
+function load(d) {
+  trades = Array.isArray(d) ? d : (d.trades || []);
+  if (!Array.isArray(d)) { applySet(d.settings); prices = d.prices || {}; }
+}
+
+function init() {
+  try { load(JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) { trades = []; }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  $('mode').textContent = '資料只儲存在這支裝置的瀏覽器中，請定期按「匯出備份」。';
+  render();
+}
+
+function calc() {
+  const sorted = trades.map((t, i) => ({...t, i})).sort((a, b) => a.date.localeCompare(b.date) || a.i - b.i);
+  const pos = {}, rl = {};
+  for (const t of sorted) {
+    const k = t.ticker.trim().toUpperCase();
+    const p = pos[k] || (pos[k] = {name: t.ticker, qty: 0, cost: 0, realized: 0, over: false});
+    if (t.side === 'buy') {
+      p.qty += t.qty; p.cost += t.price * t.qty + t.fee;
+    } else {
+      const avg = p.qty > 0 ? p.cost / p.qty : 0;
+      if (t.qty > p.qty + 1e-9) p.over = true;
+      const pl = t.price * t.qty - t.fee - avg * t.qty;
+      rl[t.id] = pl; p.realized += pl;
+      p.cost -= avg * t.qty; p.qty -= t.qty;
+      if (Math.abs(p.qty) < 1e-9) { p.qty = 0; p.cost = 0; }
+    }
+  }
+  return {pos, rl};
+}
+
+function render() {
+  const {pos, rl} = calc();
+  const keys = Object.keys(pos);
+  const total = keys.reduce((s, k) => s + pos[k].realized, 0);
+  let unr = 0;
+  keys.forEach(k => { const p = pos[k], px = prices[k]; if (px > 0 && p.qty > 0) { p.unr = px * p.qty - p.cost; unr += p.unr; } });
+  const setT = (id, v) => { $(id).textContent = sgn(v); $(id).className = 'total ' + cls(v); };
+  setT('total', total); setT('unr', unr); setT('all', total + unr);
+
+  $('sum').innerHTML = keys.length
+    ? '<tr><th>標的</th><th>持有（股）</th><th>平均成本</th><th>現價</th><th>未實現損益</th><th>報酬率</th><th>已實現損益</th></tr>' +
+      keys.map(k => {
+        const p = pos[k], has = p.unr !== undefined;
+        return `<tr><td>${esc(p.name)}${p.over ? ' <span class="warn">賣出超過持有</span>' : ''}</td><td>${fmt(p.qty)}</td><td>${p.qty > 0 ? fmt(p.cost / p.qty) : '-'}</td><td>${p.qty > 0 ? `<input class="px" type="number" step="any" min="0" data-k="${esc(k)}" value="${prices[k] || ''}" placeholder="輸入">` : '-'}</td><td class="${cls(p.unr || 0)}">${has ? sgn(p.unr) : '-'}</td><td class="${cls(p.unr || 0)}">${has ? sgn(p.unr / p.cost * 100) + '%' : '-'}</td><td class="${cls(p.realized)}">${sgn(p.realized)}</td></tr>`;
+      }).join('')
+    : '<tr><td class="empty">尚無資料</td></tr>';
+
+  const rows = [...trades].sort((a, b) => b.date.localeCompare(a.date));
+  $('log').innerHTML = rows.length
+    ? '<tr><th>日期</th><th>標的</th><th>買／賣</th><th>價格</th><th>數量（股）</th><th>費用</th><th>損益</th><th></th></tr>' +
+      rows.map(t => `<tr><td>${esc(t.date)}</td><td>${esc(t.ticker)}</td><td>${t.side === 'buy' ? '買進' : '賣出'}</td><td>${fmt(t.price)}</td><td>${fmt(t.qty)}</td><td>${fmt(t.fee)}</td><td class="${cls(rl[t.id] || 0)}">${t.side === 'sell' ? sgn(rl[t.id] || 0) : '-'}</td><td><button class="del" data-id="${esc(t.id)}" title="刪除">✕</button></td></tr>`).join('')
+    : '<tr><td class="empty">尚無交易</td></tr>';
+}
+
+$('f').addEventListener('submit', e => {
+  e.preventDefault();
+  const side = $('sd').value, price = parseFloat($('pr').value);
+  const qty = parseFloat($('qt').value) * parseFloat($('un').value);
+  let fee;
+  if ($('fe').value === '') {
+    fee = Math.max(parseFloat($('mf').value) || 0, Math.round(price * qty * 0.001425 * (parseFloat($('dc').value) || 0) / 10));
+    if (side === 'sell') fee += Math.floor(price * qty * parseFloat($('tx').value));
+  } else fee = parseFloat($('fe').value) || 0;
+  trades.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    ticker: $('tk').value.trim(), side, date: $('dt').value, price, qty, fee
+  });
+  $('pr').value = ''; $('qt').value = ''; $('fe').value = '';
+  save(); render();
+});
+
+$('sum').addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.k;
+  if (!k) return;
+  prices[k] = parseFloat(e.target.value) || 0;
+  save(); render();
+});
+
+$('log').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  if (!confirm('確定刪除這筆交易？')) return;
+  trades = trades.filter(t => t.id !== id);
+  save(); render();
+});
+
+$('exp').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify({trades, settings: getSet(), prices}, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'invest-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+});
+$('imp').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!confirm('匯入會覆蓋目前所有資料，確定嗎？')) return;
+    load(d); save(); render();
+  } catch (err) { alert('檔案格式不正確'); }
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+['dc','mf','tx'].forEach(i => $(i).addEventListener('change', save));
+render();
+init();
+</script>
+</body>
+</html>
